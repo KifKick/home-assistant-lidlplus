@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Any
 
+from .extras import coupon_summary
+
 
 def _pick(data: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
     return {key: data[key] for key in keys if key in data}
@@ -758,6 +760,17 @@ class Coupon:
     discount: str | None = None
     valid_from: str | None = None
     valid_to: str | None = None
+    image_url: str | None = None
+
+    category = "coupon"
+
+    @property
+    def key(self) -> str:
+        return f"coupon_{self.coupon_id}"
+
+    @property
+    def summary(self) -> str:
+        return coupon_summary(self.title, self.discount, self.valid_to)
 
     def can_activate(self) -> bool:
         """True for one-tap coupons, including Dla Ciebie, Kupon Plus and Online."""
@@ -811,6 +824,8 @@ class Coupon:
             "discount": self.discount,
             "valid_from": self.valid_from,
             "valid_to": self.valid_to,
+            "image_url": self.image_url,
+            "summary": self.summary,
         }
 
     @classmethod
@@ -852,7 +867,20 @@ class Coupon:
             discount=discount_text(item.get("discount")),
             valid_from=validity_field(item.get("validity"), "start"),
             valid_to=validity_field(item.get("validity"), "end"),
+            image_url=_image_url(item),
         )
+
+
+def _image_url(item: dict[str, Any]) -> str | None:
+    for key in ("image", "imageUrl", "imageURL", "img"):
+        value = item.get(key)
+        if isinstance(value, dict):
+            value = value.get("url") or value.get("default")
+        if isinstance(value, list) and value:
+            value = value[0] if isinstance(value[0], str) else None
+        if isinstance(value, str) and value.startswith("http"):
+            return value
+    return None
 
 
 @dataclass
@@ -940,3 +968,15 @@ class LidlPlusData:
     upcoming_coupons: list[Coupon] = field(default_factory=list)
     last_reward: CouponReward | None = None
     reward_history: list[CouponReward] = field(default_factory=list)
+    scratch_cards: list[Any] = field(default_factory=list)
+    gift_boxes: list[Any] = field(default_factory=list)
+    coupon_plus: Any = None
+    stamp_cards: list[Any] = field(default_factory=list)
+    home_message: str | None = None
+    deposits: Any = None
+    alerts_unread: int | None = None
+    store_schedule: Any = None
+    shopping_lists: list[Any] = field(default_factory=list)
+    # Things first seen in this refresh; event entities announce them.
+    # Each has `category` and `as_dict()` (new coupons come as one batch).
+    new_offers: list[Any] = field(default_factory=list)
